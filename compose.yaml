@@ -5,7 +5,10 @@ services:
       context: .
       dockerfile: dockerbiblioteka/Dockerfile
     ports:
-      - "${APP_PORT:-8080}:8080"
+      # Za proxy publikacja portu nie jest potrzebna — NPM dosięga kontenera po
+      # public_net. Ustaw APP_BIND=127.0.0.1, żeby port był dostępny tylko lokalnie
+      # na serwerze (diagnostyka), a nie z internetu z pominięciem TLS.
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:8080"
     environment:
       # Wartości pochodzą z .env (lokalnie) albo z sekcji "Environment variables"
       # stacka w Portainerze. Zmienne środowiskowe nadpisują appsettings.json,
@@ -14,32 +17,31 @@ services:
       - KeycloakAuth__ClientId=${KEYCLOAK_CLIENT_ID}
       - KeycloakAuth__ClientSecret=${KEYCLOAK_CLIENT_SECRET}
       - KeycloakAuth__SessionKeyNamespace=${KEYCLOAK_SESSION_NAMESPACE}
-      # Redis pochodzi ze wspólnej warstwy infra (infra/compose.yaml) i jest widoczny
-      # pod nazwą serwisu "redis" w sieci "shared-infra".
+      # Redis jest widoczny pod nazwą swojego kontenera w sieci internal_net.
       - KeycloakAuth__RedisConnectionString=${REDIS_CONNECTION}
       # --- ZA REVERSE PROXY (Nginx Proxy Manager) ---
-      # Puste = brak proxy (lokalnie po http). Ustawione -> UseForwardedHeaders(),
-      # czyli apka widzi https i publiczny host z nagłówków X-Forwarded-*.
+      # CIDR sieci, z której proxy łączy się z kontenerem — dla public_net
+      # jest to 172.18.0.0/16. Puste = brak proxy (lokalnie po http).
       - ReverseProxy__KnownNetwork=${REVERSE_PROXY_NETWORK:-}
     volumes:
       # Key ring Data Protection — przeżywa redeploy, więc sesje użytkowników
       # nie giną przy każdym restarcie stacka.
       - dp-keys:/keys
     networks:
-      - shared-infra
-      # Za proxy dopnij też sieć NPM, żeby proxy dosięgło kontener:
-      # - proxy
+      # Zaplecze: Redis i inne usługi wewnętrzne.
+      - internal_net
+      # Tędy Nginx Proxy Manager dosięga kontenera.
+      - public_net
 
 volumes:
   dp-keys:
 
 networks:
-  # Sieć tworzona przez infra/compose.yaml — tutaj tylko się do niej podpinamy.
-  # Wymaga wcześniejszego: docker compose -f infra/compose.yaml up -d
-  shared-infra:
+  # Obie sieci istnieją już na serwerze — stack tylko się do nich podpina.
+  # Lokalnie utwórz je raz: docker network create internal_net && docker network create public_net
+  internal_net:
     external: true
-    name: shared-infra
-  # Sieć Nginx Proxy Manager (istniejąca) — odkomentuj razem z wpisem w services.networks.
-  # proxy:
-  #   external: true
-  #   name: <nazwa-sieci-npm>
+    name: internal_net
+  public_net:
+    external: true
+    name: public_net
