@@ -1,0 +1,45 @@
+services:
+  dockerbiblioteka:
+    image: dockerbiblioteka
+    build:
+      context: .
+      dockerfile: dockerbiblioteka/Dockerfile
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      # Wartości pochodzą z .env (lokalnie) albo z sekcji "Environment variables"
+      # stacka w Portainerze. Zmienne środowiskowe nadpisują appsettings.json,
+      # a "__" to separator zagnieżdżenia sekcji w ASP.NET Core.
+      - KeycloakAuth__Authority=${KEYCLOAK_AUTHORITY}
+      - KeycloakAuth__ClientId=${KEYCLOAK_CLIENT_ID}
+      - KeycloakAuth__ClientSecret=${KEYCLOAK_CLIENT_SECRET}
+      - KeycloakAuth__SessionKeyNamespace=${KEYCLOAK_SESSION_NAMESPACE}
+      # Redis pochodzi ze wspólnej warstwy infra (infra/compose.yaml) i jest widoczny
+      # pod nazwą serwisu "redis" w sieci "shared-infra".
+      - KeycloakAuth__RedisConnectionString=${REDIS_CONNECTION}
+      # --- ZA REVERSE PROXY (Nginx Proxy Manager) ---
+      # Puste = brak proxy (lokalnie po http). Ustawione -> UseForwardedHeaders(),
+      # czyli apka widzi https i publiczny host z nagłówków X-Forwarded-*.
+      - ReverseProxy__KnownNetwork=${REVERSE_PROXY_NETWORK:-}
+    volumes:
+      # Key ring Data Protection — przeżywa redeploy, więc sesje użytkowników
+      # nie giną przy każdym restarcie stacka.
+      - dp-keys:/keys
+    networks:
+      - shared-infra
+      # Za proxy dopnij też sieć NPM, żeby proxy dosięgło kontener:
+      # - proxy
+
+volumes:
+  dp-keys:
+
+networks:
+  # Sieć tworzona przez infra/compose.yaml — tutaj tylko się do niej podpinamy.
+  # Wymaga wcześniejszego: docker compose -f infra/compose.yaml up -d
+  shared-infra:
+    external: true
+    name: shared-infra
+  # Sieć Nginx Proxy Manager (istniejąca) — odkomentuj razem z wpisem w services.networks.
+  # proxy:
+  #   external: true
+  #   name: <nazwa-sieci-npm>

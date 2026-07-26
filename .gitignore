@@ -1,0 +1,11 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+
+# Zmienne środowiskowe / sekrety — nigdy do repo.
+# Szablon bez wartości trzymamy w .env.example.
+.env
+.env.*
+!.env.example
