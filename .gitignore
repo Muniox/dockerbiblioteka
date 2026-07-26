@@ -4,8 +4,9 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 
+# Ustawienia IDE (Rider).
+.idea/
+
 # Zmienne środowiskowe / sekrety — nigdy do repo.
-# Szablon bez wartości trzymamy w .env.example.
 .env
 .env.*
-!.env.example
